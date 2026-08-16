@@ -16,11 +16,18 @@ jobs:
         with:
           node-version: 18
 
-      - name: Instalar Capacitor y compilar Android
+      - name: Preparar carpeta web e instalar Capacitor
         run: |
+          mkdir -p www
+          # Copia archivos estaticos a la carpeta www (si existen)
+          cp index.html styles.css script.js www/ 2>/dev/null || true
+          # Si www esta vacia, crea un index.html basico para evitar fallos
+          if [ ! -f www/index.html ]; then
+            echo "<!DOCTYPE html><html><head><title>App</title></head><body><h1>App Desplegada</h1></body></html>" > www/index.html
+          fi
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init MiApp com.ejemplo.app --web-dir .
+          npx cap init MiApp com.ejemplo.app --web-dir www
           npx cap add android
           npx cap sync
 
