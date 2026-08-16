@@ -14,34 +14,32 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
+
+      - name: Configurar Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
 
       - name: Preparar carpeta web e instalar Capacitor
         run: |
           mkdir -p www
-          # Copia archivos estaticos a la carpeta www (si existen)
           cp index.html styles.css script.js www/ 2>/dev/null || true
-          # Si www esta vacia, crea un index.html basico para evitar fallos
           if [ ! -f www/index.html ]; then
             echo "<!DOCTYPE html><html><head><title>App</title></head><body><h1>App Desplegada</h1></body></html>" > www/index.html
           fi
           npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npm install @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest
           npx cap init MiApp com.ejemplo.app --web-dir www
           npx cap add android
           npx cap sync
-
-      - name: Configurar Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
 
       - name: Compilar APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
       - name: Subir APK como Artefacto (URL de Descarga)
         uses: actions/upload-artifact@v4
