@@ -1,48 +1,80 @@
-name: Compilar APK Nativo
+name: Compilar APK Nativo Robusto
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx2048m -XX:MaxMetaspaceSize=512m'"
+
     steps:
-      - name: Descargar codigo
+      - name: 1. Descargar codigo del repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js
+      - name: 2. Configurar Node.js (v22 LTS)
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Configurar Java JDK
+      - name: 3. Configurar Java JDK (v21 Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Preparar carpeta web e instalar Capacitor
+      - name: 4. Procesar y Compilar Proyecto Web
         run: |
+          echo "=== INSTALANDO DEPENDENCIAS ==="
+          npm install --legacy-peer-deps || true
+          
+          echo "=== EJECUTANDO BUILD SI EXISTE ==="
+          npm run build --if-present || true
+
+      - name: 5. Preparar Carpeta 'www' y Sincronizar Capacitor
+        run: |
+          echo "=== LIMPIANDO Y CREANDO WWW ==="
+          rm -rf www
           mkdir -p www
-          cp index.html styles.css script.js www/ 2>/dev/null || true
-          if [ ! -f www/index.html ]; then
-            echo "<!DOCTYPE html><html><head><title>App</title></head><body><h1>App Desplegada</h1></body></html>" > www/index.html
+          
+          echo "=== COPIANDO ARCHIVOS DEL PROYECTO REAL ==="
+          if [ -d "dist" ] && [ "$(ls -A dist)" ]; then
+            cp -r dist/* www/
+          elif [ -d "build" ] && [ "$(ls -A build)" ]; then
+            cp -r build/* www/
+          elif [ -d "public" ] && [ "$(ls -A public)" ]; then
+            cp -r public/* www/
+          else
+            rsync -av --exclude='android' --exclude='node_modules' --exclude='.git' --exclude='.github' --exclude='www' ./ www/
           fi
-          npm init -y
+
+          echo "=== VALIDANDO INDEX.HTML ==="
+          if [ ! -f www/index.html ]; then
+            echo "ERROR CRITICO: No se encontró index.html en tu proyecto."
+            exit 1
+          fi
+
+          echo "=== INSTALANDO CAPACITOR NATIVO ==="
           npm install @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest
+
+          echo "=== REGENERANDO PROYECTO ANDROID ==="
+          rm -rf android
           npx cap init MiApp com.ejemplo.app --web-dir www
           npx cap add android
-          npx cap sync
+          npx cap sync android
 
-      - name: Compilar APK
+      - name: 6. Compilar Archivo APK con Gradle
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew clean assembleDebug --no-daemon
+          ./gradlew clean assembleDebug --no-daemon --stacktrace
 
-      - name: Subir APK como Artefacto
+      - name: 7. Subir APK Nativo Listo para Instalar
         uses: actions/upload-artifact@v4
         with:
           name: mi-aplicacion-nativa
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
