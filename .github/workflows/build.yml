@@ -39,10 +39,10 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew clean assembleDebug --no-daemon
 
-      - name: Subir APK como Artefacto (URL de Descarga)
+      - name: Subir APK como Artefacto
         uses: actions/upload-artifact@v4
         with:
           name: mi-aplicacion-nativa
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/*.apk
